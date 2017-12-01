@@ -24,7 +24,7 @@ PeksTask *alice=NULL, *bob=NULL, *alice2=NULL;
 pthread_t attached_thread(thread_func f, void* in) {pthread_t t; pthread_create(&t,NULL,f,in); return t;}    // a new thread awaited
 void wait_thread(pthread_t t) { if (pthread_join(t, NULL)) EXIT();}
 void detached_thread(thread_func f, void* in) {pthread_t t; if(pthread_create(&t,NULL,f,in)==0)pthread_detach(t);}
-void* relay_detached_thread(void* in) {PeksMsgEvent* e=(PeksMsgEvent*)in; e->relay_events(); return NULL;}
+ivoid* relay_detached_thread(void* in) {PeksMsgEvent* e=(PeksMsgEvent*)in; e->relay_events(); return NULL;}
 double get_timer(){struct timeval tp; gettimeofday(&tp,0); return ((double)(tp.tv_sec)+(double) (tp.tv_usec) * 1.e-6);}
 int freshid() {static int i=5; return __sync_add_and_fetch(&i, 1); }
 void sem_waitpost(sem_t* s) {sem_wait(s); sem_post(s);}
@@ -41,8 +41,7 @@ FILE* block_path(const char *ds_name, int if_r, int ltid, int bsid, int bid) {
     FILE * f = fopen(path, "wb");
     if (f==NULL) {int mode = 0777;
         sprintf(path,"%s", root_path); mkdir(path, mode);
-        sprintf(path,"%s/%s", root_path,ds_name); mkdir(path, mode);
-        sprintf(path,"%s/%s/%d", root_path,ds_name, ltid); mkdir(path, mode);
+        sprintf(path,"%s/%s", root_path,ds_name); mkdir(path, mode);        sprintf(path,"%s/%s/%d", root_path,ds_name, ltid); mkdir(path, mode);
         sprintf(path,"%s/%s/%d/%d",root_path,ds_name,ltid,bsid);mkdir(path,mode);
         sprintf(path,"%s/%s/%d/%d/%d.pex", root_path,ds_name, ltid, bsid, bid);
         f = fopen(path, "wb"); if (f==NULL) EXIT2(path); }
@@ -53,7 +52,7 @@ int bdcast_succ0(int pid) {int n0 = 0, n1 = NRELAYS;  // d as degree of bdcast s
     while (pid > n1) {int nt = n1; n1 = (n1 - n0)*NRELAYS + n1; n0 = nt;}
     return (pid-n0-1)*NRELAYS + n1 + 1;    // all pids are relative from root=0
 }
-int bdcast_succ(int pid, int root, int k, int n) {  // n as num of processes
+int bdcast_succ(int pid, int root, int k, int n) {  // n as num of processe
     int tpid = (pid-root+n)%n;  int succ = bdcast_succ0(tpid)+k;
     if (succ>=n) return root; return (succ+root)%n;
 }
@@ -86,7 +85,7 @@ void PeksMsgEvent::relay_events() {
         case EVENT_TYPE_NEWTASK:
            PeksContentTask* content = (PeksContentTask*)payload();
            content->print();
-//           alice2 = division.create_task(content);
+//           alice2 = division.create_task(content)
            break;
     }
     sem_post(&relay_events_csec);
@@ -111,7 +110,7 @@ PeksBlockset* PeksThread::get(int i) {sem_wait(&monitor);     if (blocksets[i]==
 
 sem_t broadcast_event_csec;
 void PeksTask::broadcast_event(int type, int len, void* content) {
-	
+
     if (lpid!=0) return;
     sem_wait(&broadcast_event_csec);            // broadcast is atomic to ensure correct echoing
     current_eventid = freshid(); nevents_replied=0;                 // a fresh event
@@ -120,7 +119,6 @@ void PeksTask::broadcast_event(int type, int len, void* content) {
     print_echo(e);
     sem_post(&broadcast_event_csec);                                // complete
 }
-
 void PeksComm::after_irecv(int msgt, void* msgbuf) {
     if (msgt==MSG_BLOCK) {PeksMsgBlock* data = (PeksMsgBlock*)msgbuf;
         division.tasks[data->taskid]->get(data->ttid)->get(data->tbsid)->get(data->tbid)->overwrite(data); }
@@ -129,7 +127,7 @@ void PeksComm::after_irecv(int msgt, void* msgbuf) {
             e->slpid=t->lpid; t->broadcast_update_event(e);         // buffer large enough for enlargement
             detached_thread(relay_detached_thread, e->dup());    }
         else t->broadcast_echo(e);                                  // root collecting results from echo 
-    }
+    
 }
 
 /*
@@ -138,7 +136,7 @@ void PeksComm::after_irecv(int msgt, void* msgbuf) {
     If the second message is not received within timeout, the procedure is repeated by excluding the un-answering ones.
     If too few processes are left (up to a percentage thresold), the procedure is repeated from the beginning.
     No activities between the two messages. Only root can perform re-shaping to avoid interference.+   To create a new task, the root first broadcasts to investigate the resources.    If successful, it decides about a new task's threads and broadcasts it in another round.
-    We cannot use multi-roots for creation, as the procedure could be interupted by a re-shapping.
+    We cannot use multi-roots for creation, as the procedure could be interupted by a re-shapping
     Thus a source must interleave the broadcasts from it.
 +   For the communicator, if a message is not sent successfully in a timeout, we set a flag,
     and MPI_Abort before MPI_Finalize.
@@ -147,7 +145,7 @@ void PeksComm::communicator() {MPI_Status status; int k=0;  // send queue contai
     while(1) {MPI_Request req;  int flag=0; int msgt;
         MPI_Irecv(msgbuf, BLOCK_SIZE, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG,  MPI_COMM_WORLD, &req);
         while (1) {if (process_exit && n==0) return; 
-            MPI_Test(&req, &flag, &status); if (flag) {msgt = status.MPI_TAG-TAG_BASE;  break;} // one msg received
+            MPI_Test(&req, &flag, &status); if (flag) {msgt = status.MPI_TAG-TAG_BASE;  break;} // one msg receive
             sem_wait(&comm_csec); 
 
 		   if (n>0) {if (reqs[k]==NULL) reqs[k]=isend(type[k], r[k]);
@@ -181,7 +179,6 @@ void* bob_code(void* thread) {PeksThread* t = (PeksThread*)thread;
 }
 
 thread_func* user_codes[3] = {alice_code, bob_code, alice2_code};
-//thread_func* user_codes[2] = {alice_code, bob_code};//@
 #include "newtask.c"
 //===============================================================================
 int main(int argc, char *argv[]){ MPI_Init(&argc, &argv); 
