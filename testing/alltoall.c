@@ -17,7 +17,6 @@
 #include <dirent.h>
 #include <mpi.h>
 #include <semaphore.h>
-//$include "parray.pa"
 #include "peks.h"
 int mpi_pid; int nprocs; int process_exit=0;         // entire process exit
 PeksDivision division;  PeksComm comm;
@@ -138,8 +137,7 @@ void PeksComm::after_irecv(int msgt, void* msgbuf) {
     Un-answering processes will be excluded from receiving the second message containing the new set of working pids.
     If the second message is not received within timeout, the procedure is repeated by excluding the un-answering ones.
     If too few processes are left (up to a percentage thresold), the procedure is repeated from the beginning.
-    No activities between the two messages. Only root can perform re-shaping to avoid interference.
-+   To create a new task, the root first broadcasts to investigate the resources.    If successful, it decides about a new task's threads and broadcasts it in another round.
+    No activities between the two messages. Only root can perform re-shaping to avoid interference.+   To create a new task, the root first broadcasts to investigate the resources.    If successful, it decides about a new task's threads and broadcasts it in another round.
     We cannot use multi-roots for creation, as the procedure could be interupted by a re-shapping.
     Thus a source must interleave the broadcasts from it.
 +   For the communicator, if a message is not sent successfully in a timeout, we set a flag,
@@ -213,5 +211,3 @@ int main(int argc, char *argv[]){ MPI_Init(&argc, &argv);
     MPI_Finalize();  return 0;
 }
 
-//$main{
-//}
