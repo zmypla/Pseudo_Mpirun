@@ -4,7 +4,6 @@
 + must the dataset already exist?
 + note that two major perf problems: 1. memory management, 2. utilizing all cores for small dataset
 */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,16 +19,13 @@
 #include <semaphore.h>
 //$include "parray.pa"
 #include "peks.h"
-
 int mpi_pid; int nprocs; int process_exit=0;         // entire process exit
 PeksDivision division;  PeksComm comm;
 PeksTask *alice=NULL, *bob=NULL, *alice2=NULL; 
-
 pthread_t attached_thread(thread_func f, void* in) {pthread_t t; pthread_create(&t,NULL,f,in); return t;}    // a new thread awaited
 void wait_thread(pthread_t t) { if (pthread_join(t, NULL)) EXIT();}
 void detached_thread(thread_func f, void* in) {pthread_t t; if(pthread_create(&t,NULL,f,in)==0)pthread_detach(t);}
 void* relay_detached_thread(void* in) {PeksMsgEvent* e=(PeksMsgEvent*)in; e->relay_events(); return NULL;}
-
 double get_timer(){struct timeval tp; gettimeofday(&tp,0); return ((double)(tp.tv_sec)+(double) (tp.tv_usec) * 1.e-6);}
 int freshid() {static int i=5; return __sync_add_and_fetch(&i, 1); }
 void sem_waitpost(sem_t* s) {sem_wait(s); sem_post(s);}
@@ -110,8 +106,7 @@ void PeksBlock::load(int ltid, int bsid, int bid) {
     int ret = fread(data, 1, BLOCK_SIZE, f);  if (ret!=BLOCK_SIZE) EXIT();  sem_post(&exist); fclose(f);  
 }
 
-PeksBlockset* PeksThread::get(int i) {sem_wait(&monitor); 
-    if (blocksets[i]==NULL) {blocksets[i]=new PeksBlockset(); blocksets[i]->init(this,i,hometask->tabnblocks[tid*nblksets+i]);}
+PeksBlockset* PeksThread::get(int i) {sem_wait(&monitor);     if (blocksets[i]==NULL) {blocksets[i]=new PeksBlockset(); blocksets[i]->init(this,i,hometask->tabnblocks[tid*nblksets+i]);}
     sem_post(&monitor); return blocksets[i];
 }
 
@@ -121,8 +116,7 @@ void PeksTask::broadcast_event(int type, int len, void* content) {
     if (lpid!=0) return;
     sem_wait(&broadcast_event_csec);            // broadcast is atomic to ensure correct echoing
     current_eventid = freshid(); nevents_replied=0;                 // a fresh event
-    PeksMsgEvent *e = PeksMsgEvent::create(taskid, 0, 0, mpi_pid, current_eventid, type, len, content);  // root's self msg
-    e->occur(); //stop
+    PeksMsgEvent *e = PeksMsgEvent::create(taskid, 0, 0, mpi_pid, current_eventid, type, len, content);  // root's self msg    e->occur(); //stop
     sem_wait(&echo_complete);       // the root thread will be suspended until completion, need to handle timeout!!!
     print_echo(e);
     sem_post(&broadcast_event_csec);                                // complete
@@ -145,8 +139,7 @@ void PeksComm::after_irecv(int msgt, void* msgbuf) {
     If the second message is not received within timeout, the procedure is repeated by excluding the un-answering ones.
     If too few processes are left (up to a percentage thresold), the procedure is repeated from the beginning.
     No activities between the two messages. Only root can perform re-shaping to avoid interference.
-+   To create a new task, the root first broadcasts to investigate the resources.
-    If successful, it decides about a new task's threads and broadcasts it in another round.
++   To create a new task, the root first broadcasts to investigate the resources.    If successful, it decides about a new task's threads and broadcasts it in another round.
     We cannot use multi-roots for creation, as the procedure could be interupted by a re-shapping.
     Thus a source must interleave the broadcasts from it.
 +   For the communicator, if a message is not sent successfully in a timeout, we set a flag,
