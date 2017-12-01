@@ -149,7 +149,8 @@ void PeksComm::communicator() {MPI_Status status; int k=0;  // send queue contai
         while (1) {if (process_exit && n==0) return; 
             MPI_Test(&req, &flag, &status); if (flag) {msgt = status.MPI_TAG-TAG_BASE;  break;} // one msg received
             sem_wait(&comm_csec); 
-            if (n>0) {if (reqs[k]==NULL) reqs[k]=isend(type[k], r[k]);
+
+		   if (n>0) {if (reqs[k]==NULL) reqs[k]=isend(type[k], r[k]);
                 flag=0; if (!process_exit) MPI_Test(reqs[k], &flag, MPI_STATUS_IGNORE);
                 if (flag) {if (sent[k]!=NULL) sem_post(sent[k]); remove(k); k=0; }  else k=(k+1)%n;
             }sem_post(&comm_csec); 
@@ -158,8 +159,10 @@ void PeksComm::communicator() {MPI_Status status; int k=0;  // send queue contai
 }
 
 //===============================================================================
+
 void* alice_code(void* thread) {PeksThread* t = (PeksThread*)thread;
-    for (int k=0; k<3; k++) {PeksBlock* b = t->get(2)->get(k); b->alloc(); b->post(); b->store(); }  
+
+				for (int k=0; k<3; k++) {PeksBlock* b = t->get(2)->get(k); b->alloc(); b->post(); b->store(); }  
 	printf("i am alice\n");  
     return NULL;
 }
@@ -180,7 +183,6 @@ void* bob_code(void* thread) {PeksThread* t = (PeksThread*)thread;
 thread_func* user_codes[3] = {alice_code, bob_code, alice2_code};
 //thread_func* user_codes[2] = {alice_code, bob_code};//@
 #include "newtask.c"
-
 //===============================================================================
 int main(int argc, char *argv[]){ MPI_Init(&argc, &argv); 
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_pid); MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
@@ -193,9 +195,7 @@ int main(int argc, char *argv[]){ MPI_Init(&argc, &argv);
     MPI_Barrier(MPI_COMM_WORLD);   
     pthread_t comm_thread = attached_thread(communicator, NULL);            // starting the comm thread
     bob = division.create_task((char*)"bob", true, 5, 9, 5*3*3, 3, -1, 1);
-        PeksContentTask* ct = PeksContentTask::create(division.taskid, 5, 5*3*3, 3, bob->taskid, 2, (char*)"alice"); 
-	  
-
+        PeksContentTask* ct = PeksContentTask::create(division.taskid, 5, 5*3*3, 3, bob->taskid, 2, (char*)"alice2"); 
 	if (task0->lpid==0) {	//there is a problem;
         task0->broadcast_event(EVENT_TYPE_SURVEY, 8, (void*)"abcdefg");
         task0->broadcast_event(EVENT_TYPE_NEWTASK, ct->size, ct);           // 5 procs, 5 blksets, each of 9 blocks, codeid=2
